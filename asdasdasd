@@ -1,0 +1,352 @@
+    // Find lobby
+    let url, body;
+    if (selectedServerIdx == 0) {
+      url = RIVET_API + "/lobbies/find";
+      body = { game_modes: [gameModeId] };
+    } else {
+      console.log("Selecting server", this.server_list, this.selected_server, this.current_mode);
+      let selectedServer = this.server_list.find(x => x.gm == gameModeId && x.idx == selectedServerIdx);
+      console.log("Selected server", selectedServer);
+
+      url = RIVET_API + "/lobbies/join";
+      body = { lobby_id: selectedServer.id };
+    }
+    let headers = {};
+    if (rivetToken) headers["Authorization"] = `Bearer ${rivetToken}`;
+    let res = await fetch(url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) {
+      alert("Failed to join lobby");
+      return;
+    }
+    let resBody = await res.json();
+    console.log("Lobby", resBody);
+
+    let port = resBody.lobby.ports.default;
+    let dns = port.host;
+    let ssl = port.is_tls;
+    let playerToken = resBody.lobby.player.token;
+
+    // Open socket
+    let socketAddress = "ws" + (ssl ? "s" : "") + "://" + dns + "?token=" + playerToken;
+    console.log("Socket address", socketAddress);
+    this.socket = new window.WebSocket(
+      socketAddress
+    );
+    this.socket["binaryType"] = "arraybuffer";
+    this.socket._current_id = this._current_id;
+
+    /* When server send a message */
+    this.socket.onmessage = function (evt) {
+      /* Skip old message */
+      if (this._current_id != _this._current_id) return;
+
+      /* If unicode data */
+      if (typeof evt.data == "string") {
+        var msg = JSON.parse(evt.data);
+
+        switch (msg[0]) {
+          case 0:
+            _this.chat(msg);
+            break;
+          case 1:
+            _this.kick(msg[1]);
+            break;
+          case 2:
+            _this.new_player(msg);
+            break;
+          case 3:
+            _this.handshake(msg);
+            break;
+          case 4:
+            _this.message(msg[1]);
+            break;
+          case 5:
+            _this.commands(msg);
+            break;
+          case 6:
+            _this.welcome(msg[1]);
+            break;
+        }
+
+        /* Else raw data */
+      } else {
+        // Decode data
+        var ui8 = new Uint8Array(evt.data);
+
+        switch (ui8[0]) {
+          case 0:
+            _this.units(evt.data, ui8, false);
+            break;
+          case 1:
+            _this.units(evt.data, ui8, true);
+            break;
+          case 2:
+            _this.cancel_craft();
+            break;
+          case 3:
+            _this.gather(new Uint16Array(evt.data));
+            break;
+          case 4:
+            _this.old_version();
+            break;
+          case 5:
+            _this.full();
+            break;
+          case 6:
+            _this.dont_harvest();
+            break;
+          case 7:
+            _this.hitten(evt.data);
+            break;
+          case 8:
+            _this.build_stop(ui8[1]);
+            break;
+          case 9:
+            _this.build_ok(ui8[1]);
+            break;
+          case 10:
+            _this.inv_full();
+            break;
+          case 11:
+            _this.decrease_item(ui8[1], ui8[2]);
+            break;
+          case 12:
+            _this.workbench(ui8[1]);
+            break;
+          case 13:
+            _this.hitten_other(ui8, evt.data);
+            break;
+          case 14:
+            _this.mute();
+            break;
+          case 15:
+            _this.kill_player(ui8[1]);
+            break;
+          case 16:
+            _this.gauges(
+              ui8[1],
+              ui8[2],
+              ui8[3],
+              ui8[4],
+              ui8[5],
+              ui8[6],
+              ui8[7]
+            );
+            break;
+          case 17:
+            _this.recover_focus(evt.data);
+            break;
+          case 18:
+            _this.empty_res();
+            break;
+          case 19:
+            _this.fire(ui8[1]);
+            break;
+          case 20:
+            _this.survive();
+            break;
+          case 21:
+            _this.leaderboard(evt.data);
+            break;
+          case 22:
+            _this.get_time(ui8[1]);
+            break;
+          case 23:
+            _this.set_cam(evt.data);
+            break;
+          case 24:
+            _this.accept_build(ui8[1]);
+            break;
+          case 25:
+            _this.killed(ui8[1], evt.data);
+            break;
+          case 26:
+            _this.minimap(ui8);
+            break;
+          case 27:
+            _this.fail_restore();
+            break;
+          case 28:
+            _this.ghost(ui8[1]);
+            break;
+          case 29:
+            _this.reborn();
+            break;
+          case 30:
+            _this.steal_token();
+            break;
+          case 31:
+            _this.join_new_team(ui8);
+            break;
+          case 32:
+            _this.exclude_team(ui8[1]);
+            break;
+          case 33:
+            _this.new_member_team(ui8[1]);
+            break;
+          case 34:
+            _this.destroy_team();
+            break;
+          case 35:
+            _this.kit_ok(ui8[1]);
+            break;
+          case 36:
+            _this.water(ui8[1]);
+            break;
+          case 37:
+            _this.gauges_life(ui8[1], ui8[2]);
+            break;
+          case 38:
+            _this.gauges_food(ui8[1]);
+            break;
+          case 39:
+            _this.gauges_water(ui8[1]);
+            break;
+          case 40:
+            _this.get_bag();
+            break;
+          case 41:
+            _this.verified_account(ui8);
+            break;
+          case 42:
+            _this.succeed_quest(ui8[1]);
+            break;
+          case 43:
+            _this.fail_quest(ui8[1]);
+            break;
+          case 44:
+            _this.claimed(ui8[1]);
+            break;
+          case 45:
+            _this.recycle_ok(ui8[1]);
+            break;
+          case 46:
+            _this.recycle_stop(ui8[1]);
+            break;
+          case 47:
+            _this.well(ui8[1]);
+            break;
+          case 48:
+            _this.no_resources();
+            break;
+          case 50:
+            _this.decrease_item2(ui8[1], ui8[2], ui8[3]);
+            break;
+          case 51:
+            _this.blocked();
+            break;
+          case 52:
+            _this.delete_inv_ok(ui8[1]);
+            break;
+          case 53:
+            _this.delete_one_inv_ok(ui8[1]);
+            break;
+          case 54:
+            _this.account_ok();
+            break;
+          case 55:
+            _this.gauges_warm(ui8[1]);
+            break;
+          case 56:
+            _this.gauges_cold(ui8[1]);
+            break;
+          case 57:
+            _this.new_version();
+            break;
+          case 58:
+            _this.wrong_password();
+            break;
+          case 59:
+            _this.clean_inventory();
+            break;
+          case 60:
+            _this.hide_shop_kit();
+            break;
+          case 61:
+            user.cam.forcedDelay = 0.2;
+            user.cam.delay = 3;
+            break;
+          case 62:
+            _this.delete_single_inv(new Uint16Array(evt.data));
+            break;
+          case 63:
+            _this.hide_clock();
+            break;
+          case 64:
+            _this.hide_recipe_book();
+            break;
+          case 65:
+            _this.hide_quest();
+            break;
+          case 66:
+            _this.hide_market();
+            break;
+          case 67:
+            _this.explorer_quest(ui8[1]);
+            break;
+          case 68:
+            _this.sand_tempest(ui8[1]);
+            break;
+          case 69:
+            _this.blizzard(ui8[1]);
+            break;
+          case 70:
+            _this.blizzard_status(ui8[1]);
+            break;
+          case 71:
+            _this.bandage(ui8[1]);
+            break;
+        }
+      }
+    };
+
+    /* When server open connection */
+    this.socket.onopen = function () {
+      /* Clear previous timeout */
+      clearTimeout(_this.timeout_handler);
+
+      user.newToken = user.newToken || Utils.getURLData("token");
+
+      Utils.get_recaptcha_token()
+        .then((recaptcha_token) => {
+          /* Send user information */
+          _this.socket[SENDWORD](
+            WINDOW10[JSONWORD9].stringify([
+              ui.nickname.input.value,
+              screen.width + 200,
+              screen.height + 200,
+              CLIENT.VERSION_NUMBER,
+              user.token,
+              user.token_id,
+              // Math.random () + "", Math.random () + "",
+              user.reconnect.enabled ? 1 : 0,
+              ui.skin,
+              ui.accessory,
+              ui.bag,
+              ui.book,
+              ui.crate,
+              ui.dead,
+              userId === undefined ? 0 : userId,
+              userToken === undefined
+                ? 0
+                : userToken.substring(userToken.length - 50),
+              PASSWORD,
+              user.newToken,
+              recaptcha_token,
+            ])
+          );
+
+          /* Call the next token for the next connexion attempt */
+          user.newToken = undefined;
+
+          /* wait for server */
+          _this.timeout_handler = setTimeout(_this.timeout, CLIENT.TIMEOUT_TIME);
+        })
+    };
+
+  };
+}
